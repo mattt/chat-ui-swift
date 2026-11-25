@@ -110,8 +110,8 @@ struct ChatDetailView: View {
 
         inputText = ""
 
-        Task {
-            await viewModel.sendMessage(to: chat, content: message)
+        Task { [model = chat.model] in
+            await viewModel.sendMessage(to: chat, content: message, using: model)
         }
     }
 

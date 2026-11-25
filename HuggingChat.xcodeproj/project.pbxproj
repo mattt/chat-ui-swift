@@ -11,10 +11,12 @@
 		F816A38C2E9A81A900E4D8AC /* AnyLanguageModel in Frameworks */ = {isa = PBXBuildFile; productRef = F816A38B2E9A81A900E4D8AC /* AnyLanguageModel */; };
 		F8731C062EEAF2E5004C5EA0 /* HuggingChatKit in Frameworks */ = {isa = PBXBuildFile; productRef = F8731C052EEAF2E5004C5EA0 /* HuggingChatKit */; };
 		F8F892C82EC7465D001B04CC /* HuggingChatKit in Frameworks */ = {isa = PBXBuildFile; productRef = F8F892C72EC7465D001B04CC /* HuggingChatKit */; };
+		451D791AA52147CA9CE80007 /* HuggingChatKit in Frameworks */ = {isa = PBXBuildFile; productRef = 451D791AA52147CA9CE80008 /* HuggingChatKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		F816A36B2E9A7F4200E4D8AC /* HuggingChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HuggingChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		451D791AA52147CA9CE80003 /* HuggingChatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HuggingChatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -25,17 +27,34 @@
 			);
 			target = F816A36A2E9A7F4200E4D8AC /* HuggingChat */;
 		};
+		451D791AA52147CA9CE80004 /* App sources in HuggingChatTests */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/Chat.swift,
+				Models/Message.swift,
+				Models/Model.swift,
+				OAuth/AuthenticationManager.swift,
+				OAuth/HuggingFaceOAuth.swift,
+				OAuth/KeychainStorage.swift,
+				OAuth/OAuthModels.swift,
+				OAuth/PresentationContextProvider.swift,
+				"View Models/ChatViewModel.swift",
+			);
+			target = 451D791AA52147CA9CE80001 /* HuggingChatTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F816A36D2E9A7F4200E4D8AC /* App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				451D791AA52147CA9CE80004 /* App sources in HuggingChatTests */,
 				F88F64EA2E9BFFF700F89004 /* Exceptions for "App" folder in "HuggingChat" target */,
 			);
 			path = App;
 			sourceTree = "<group>";
 		};
+		451D791AA52147CA9CE80002 /* Tests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,6 +69,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		451D791AA52147CA9CE80006 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (451D791AA52147CA9CE80007 /* HuggingChatKit in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -57,6 +77,7 @@
 			isa = PBXGroup;
 			children = (
 				F816A36D2E9A7F4200E4D8AC /* App */,
+				451D791AA52147CA9CE80002 /* Tests */,
 				F816A36C2E9A7F4200E4D8AC /* Products */,
 			);
 			sourceTree = "<group>";
@@ -65,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				F816A36B2E9A7F4200E4D8AC /* HuggingChat.app */,
+				451D791AA52147CA9CE80003 /* HuggingChatTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -97,6 +119,22 @@
 			productName = Chat;
 			productReference = F816A36B2E9A7F4200E4D8AC /* HuggingChat.app */;
 			productType = "com.apple.product-type.application";
+		};
+		451D791AA52147CA9CE80001 /* HuggingChatTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 451D791AA52147CA9CE80009 /* Build configuration list for HuggingChatTests */;
+			buildPhases = (
+				451D791AA52147CA9CE80005 /* Sources */,
+				451D791AA52147CA9CE80006 /* Frameworks */,
+			);
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = (451D791AA52147CA9CE80002 /* Tests */,);
+			name = HuggingChatTests;
+			packageProductDependencies = (451D791AA52147CA9CE80008 /* HuggingChatKit */,);
+			productName = HuggingChatTests;
+			productReference = 451D791AA52147CA9CE80003 /* HuggingChatTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -131,6 +169,7 @@
 			projectRoot = "";
 			targets = (
 				F816A36A2E9A7F4200E4D8AC /* HuggingChat */,
+				451D791AA52147CA9CE80001 /* HuggingChatTests */,
 			);
 		};
 /* End PBXProject section */
@@ -153,6 +192,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		451D791AA52147CA9CE80005 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
@@ -384,6 +424,32 @@
 			};
 			name = Release;
 		};
+		451D791AA52147CA9CE8000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.dododo.ChatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		451D791AA52147CA9CE8000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.dododo.ChatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -401,6 +467,15 @@
 			buildConfigurations = (
 				F816A3792E9A7F4300E4D8AC /* Debug */,
 				F816A37A2E9A7F4300E4D8AC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		451D791AA52147CA9CE80009 /* Build configuration list for HuggingChatTests */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				451D791AA52147CA9CE8000A /* Debug */,
+				451D791AA52147CA9CE8000B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -431,6 +506,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = HuggingChatKit;
 		};
+		451D791AA52147CA9CE80008 /* HuggingChatKit */ = {isa = XCSwiftPackageProductDependency; productName = HuggingChatKit; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F816A3632E9A7F4200E4D8AC /* Project object */;
