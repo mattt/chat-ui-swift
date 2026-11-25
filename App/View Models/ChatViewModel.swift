@@ -6,26 +6,31 @@ import AnyLanguageModel
 @Observable
 @MainActor
 final class ChatViewModel {
-    private(set) var isGenerating = false
+    var isGenerating: Bool { currentTask != nil }
     private(set) var errorMessage: String?
 
     private let modelContext: ModelContext
-    private var sessions: [UUID: LanguageModelSession] = [:]
-    private let authManager: AuthenticationManager?
+    private var sessions: [UUID: (model: Model, session: LanguageModelSession)] = [:]
+    private let makeLanguageModel: (Model) async throws -> any LanguageModel
     private var currentTask: Task<Void, Never>?
 
-    init(modelContext: ModelContext, authManager: AuthenticationManager? = nil) {
+    convenience init(modelContext: ModelContext, authManager: AuthenticationManager? = nil) {
+        self.init(modelContext: modelContext) { model in
+            try await model.makeLanguageModel(authManager: authManager)
+        }
+    }
+
+    init(modelContext: ModelContext, makeLanguageModel: @escaping (Model) async throws -> any LanguageModel) {
         self.modelContext = modelContext
-        self.authManager = authManager
+        self.makeLanguageModel = makeLanguageModel
     }
 
     func stopGenerating() {
         currentTask?.cancel()
         currentTask = nil
-        isGenerating = false
     }
 
-    func sendMessage(to chat: Chat, content: String) async {
+    func sendMessage(to chat: Chat, content: String, using model: Model) async {
         guard !content.isEmpty else { return }
 
         let userMessage = Message(content: content, isUser: true)
@@ -37,134 +42,113 @@ final class ChatViewModel {
 
         do {
             try modelContext.save()
-            // Avoid a large batch of UI updates landing at once by yielding once
-            await Task.yield()
         } catch {
             errorMessage = "Failed to save message: \(error.localizedDescription)"
             return
         }
 
-        currentTask = Task {
-            await generateResponse(for: chat)
+        let task = Task {
+            await generateResponse(for: chat, to: userMessage, using: model)
         }
-        await currentTask?.value
-        currentTask = nil
+        currentTask = task
+        await task.value
+        if currentTask == task {
+            currentTask = nil
+        }
     }
 
-    private func generateResponse(for chat: Chat) async {
-        isGenerating = true
+    private func generateResponse(for chat: Chat, to message: Message, using model: Model) async {
+        guard !Task.isCancelled else { return }
         errorMessage = nil
+        let retained = sessions.removeValue(forKey: chat.id)
+        var assistantMessage: Message?
 
         do {
-            var assistantMessage: Message?
-            let languageModel = try await chat.model.makeLanguageModel(authManager: authManager)
-
-            guard !Task.isCancelled else {
-                isGenerating = false
-                return
-            }
+            let languageModel = try await makeLanguageModel(model)
+            try Task.checkCancellation()
 
             let session: LanguageModelSession
-            if let existingSession = sessions[chat.id] {
-                session = existingSession
+            if let retained, retained.model == model {
+                session = retained.session
             } else {
-                session = LanguageModelSession(model: languageModel)
-                sessions[chat.id] = session
+                let history = chat.messages
+                    .filter { $0.id != message.id && !$0.content.isEmpty }
+                    .sorted { $0.timestamp < $1.timestamp }
+                    .map { message -> Transcript.Entry in
+                        let segments: [Transcript.Segment] = [.text(.init(content: message.content))]
+                        if message.isUser {
+                            return .prompt(.init(segments: segments))
+                        }
+                        return .response(.init(assetIDs: [], segments: segments))
+                    }
+                session = LanguageModelSession(model: languageModel, transcript: Transcript(entries: history))
             }
-
-            // Only send the latest user message; the session's transcript maintains prior context
-            let prompt = chat.messages.last { $0.isUser }?.content ?? ""
+            let prompt = message.content
 
             // Create an assistant message immediately and update its content as we stream
-            let createdAssistantMessage = Message(content: "", isUser: false)
-            createdAssistantMessage.chat = chat
-            chat.messages.append(createdAssistantMessage)
+            let reply = Message(content: "", isUser: false)
+            reply.chat = chat
+            chat.messages.append(reply)
             chat.updatedAt = Date()
 
-            modelContext.insert(createdAssistantMessage)
-            assistantMessage = createdAssistantMessage
+            modelContext.insert(reply)
+            assistantMessage = reply
 
             var receivedAnyStreamContent = false
 
             // Prefer streaming response when available
             let stream = session.streamResponse(to: prompt)
-            do {
-                var lastLength = 0
-                for try await snapshot in stream {
-                    guard !Task.isCancelled else { break }
-                    receivedAnyStreamContent = true
-                    // Materialize a concrete String from the raw content.
-                    let full = (try? String(snapshot.rawContent)) ?? (assistantMessage?.content ?? "")
-                    // Append only the new delta to avoid duplication when snapshots are cumulative.
-                    if full.count >= lastLength {
-                        let startIdx = full.index(full.startIndex, offsetBy: lastLength)
-                        let delta = String(full[startIdx...])
-                        assistantMessage?.content += delta
-                        lastLength = full.count
-                    } else {
-                        // If content shrank (rare), reset to full.
-                        assistantMessage?.content = full
-                        lastLength = full.count
-                    }
-                    chat.updatedAt = Date()
+            var lastLength = 0
+            for try await snapshot in stream {
+                try Task.checkCancellation()
+                receivedAnyStreamContent = true
+                // Materialize a concrete String from the raw content.
+                let full = (try? String(snapshot.rawContent)) ?? reply.content
+                // Append only the new delta to avoid duplication when snapshots are cumulative.
+                if full.count >= lastLength {
+                    let startIdx = full.index(full.startIndex, offsetBy: lastLength)
+                    let delta = String(full[startIdx...])
+                    reply.content += delta
+                    lastLength = full.count
+                } else {
+                    // If content shrank (rare), reset to full.
+                    reply.content = full
+                    lastLength = full.count
                 }
-            } catch is CancellationError {
-                // On cancel, persist partial content if any; remove message if still empty
-                if let msg = assistantMessage {
-                    if msg.content.isEmpty {
-                        // Remove empty assistant message
-                        if let index = chat.messages.firstIndex(where: { $0.id == msg.id }) {
-                            chat.messages.remove(at: index)
-                        }
-                        modelContext.delete(msg)
-                    } else {
-                        try? modelContext.save()
-                    }
-                }
-                isGenerating = false
-                return
+                chat.updatedAt = Date()
             }
+            try Task.checkCancellation()
 
             // Fallback to non-streaming if no streamed content arrived (e.g., model doesn't support streaming)
-            if !receivedAnyStreamContent && !Task.isCancelled {
+            if !receivedAnyStreamContent {
                 let response = try await session.respond(to: prompt)
-                assistantMessage?.content = response.content
+                try Task.checkCancellation()
+                reply.content = response.content
                 chat.updatedAt = Date()
             }
 
-            guard !Task.isCancelled else {
-                // On cancel after streaming, same policy: keep partial, remove empty
-                if let msg = assistantMessage {
-                    if msg.content.isEmpty {
-                        if let index = chat.messages.firstIndex(where: { $0.id == msg.id }) {
-                            chat.messages.remove(at: index)
-                        }
-                        modelContext.delete(msg)
-                    } else {
-                        try? modelContext.save()
-                    }
-                }
-                isGenerating = false
-                return
-            }
-
             try modelContext.save()
+            if chat.modelContext != nil && !chat.isDeleted {
+                sessions[chat.id] = (model, session)
+            }
 
             if chat.title == nil {
                 Task {
                     await generateTitle(for: chat)
                 }
             }
-        } catch is CancellationError {
-            print("Response generation cancelled")
+        } catch where Task.isCancelled || error is CancellationError {
+            if let reply = assistantMessage {
+                if reply.content.isEmpty {
+                    chat.messages.removeAll { $0.id == reply.id }
+                    modelContext.delete(reply)
+                }
+                try? modelContext.save()
+            }
         } catch {
             print("Error generating response: \(error)")
-            await MainActor.run {
-                self.errorMessage = "Failed to generate response: \(error.localizedDescription)"
-            }
+            errorMessage = "Failed to generate response: \(error.localizedDescription)"
         }
-
-        isGenerating = false
     }
 
     private func generateTitle(for chat: Chat) async {
