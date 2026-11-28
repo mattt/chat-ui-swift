@@ -30,25 +30,36 @@ actor HuggingFaceOAuth {
         throw OAuthError.authenticationRequired
     }
 
+    /// The OAuth scopes the app requests.
+    ///
+    /// - `openid`: OpenID Connect sign-in; the app reads the `/oauth/userinfo` endpoint.
+    /// - `profile`: the username, name, and avatar that the sidebar shows.
+    /// - `inference-api`: chat completions through `router.huggingface.co`.
+    ///
+    /// See <https://huggingface.co/docs/hub/oauth#currently-supported-scopes>.
+    static let scopes = ["openid", "profile", "inference-api"]
+
+    nonisolated func authorizationURL(codeChallenge: String, state: String) -> URL? {
+        var components = URLComponents(string: "https://huggingface.co/oauth/authorize")!
+        components.queryItems = [
+            .init(name: "client_id", value: clientID),
+            .init(name: "redirect_uri", value: redirectURI),
+            .init(name: "response_type", value: "code"),
+            .init(name: "scope", value: Self.scopes.joined(separator: " ")),
+            .init(name: "code_challenge", value: codeChallenge),
+            .init(name: "code_challenge_method", value: "S256"),
+            .init(name: "state", value: state),
+        ]
+        return components.url
+    }
+
     func authenticate() async throws -> String {
         // Generate PKCE values
         let verifier = generateCodeVerifier()
         let challenge = generateCodeChallenge(from: verifier)
         self.codeVerifier = verifier
 
-        // Build authorization URL
-        var components = URLComponents(string: "https://huggingface.co/oauth/authorize")!
-        components.queryItems = [
-            .init(name: "client_id", value: clientID),
-            .init(name: "redirect_uri", value: redirectURI),
-            .init(name: "response_type", value: "code"),
-            .init(name: "scope", value: "openid profile email read-repos read-mcp inference-api"),
-            .init(name: "code_challenge", value: challenge),
-            .init(name: "code_challenge_method", value: "S256"),
-            .init(name: "state", value: generateState()),
-        ]
-
-        guard let authURL = components.url,
+        guard let authURL = authorizationURL(codeChallenge: challenge, state: generateState()),
             let scheme = URLComponents(string: redirectURI)?.scheme
         else {
             throw OAuthError.sessionFailedToStart
